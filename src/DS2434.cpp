@@ -122,6 +122,8 @@ void DS2434::duty(OneWireHub * const hub)
         }
         // NOTE: OP occupies real NV for ~ 10 ms (NVB-Bit)
         timer_nvwr = millis() + DURATION_NVWR_ms;
+        // Save to EEPROM
+        request_persist = 0xB5;
         break;
 
     case 0xB8:      // reset Cycle
@@ -129,6 +131,8 @@ void DS2434::duty(OneWireHub * const hub)
         memory[0x83] = 0u;
         // NOTE: OP occupies real NV for ~ 10 ms (NVB-Bit)
         timer_nvwr = millis() + DURATION_NVWR_ms;
+        // Save to EEPROM
+        request_persist = 0xB8;
         break;
 
     case 0x8E:      // secret command just to avoid triggering an error
