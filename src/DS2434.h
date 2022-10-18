@@ -53,9 +53,13 @@ private:
 
     static constexpr uint32_t DURATION_TEMP_ms   { 230 };
     static constexpr uint32_t DURATION_NVWR_ms   { 10 };
+
+    static constexpr uint8_t  PERSIST_STATUS     { 0x71 };
+
     uint32_t timer_temp = 0u;
     uint32_t timer_nvwr = 0u;
     bool     request_temp = false;
+    uint8_t  request_persist = 0x00;
 
     uint8_t  memory[MEM_SIZE];
     uint8_t  scratchpad[SCRATCHPAD_SIZE];
@@ -71,6 +75,10 @@ public:
     void    duty(OneWireHub * hub) final;
 
     void    clearMemory(void);
+
+    bool    checkPersistMemory(OneWireHub & hub);
+    bool    checkRestoreMemory();
+    void    persistAllMemory();
 
     bool    writeMemory(const uint8_t* source, uint16_t length, uint16_t position = 0);
     bool    readMemory(uint8_t* destination, uint16_t length, uint16_t position = 0) const;

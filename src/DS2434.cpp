@@ -1,3 +1,4 @@
+#include <EEPROM.h>
 #include "DS2434.h"
 
 DS2434::DS2434(uint8_t ID1, uint8_t ID2, uint8_t ID3, uint8_t ID4, uint8_t ID5, uint8_t ID6, uint8_t ID7) : OneWireItem(ID1, ID2, ID3, ID4, ID5, ID6, ID7)
@@ -42,14 +43,19 @@ void DS2434::duty(OneWireHub * const hub)
         break;
 
     case 0x22:      // copy scratchpad SP1 to NV1
+        
         if (memory[0x62] & 0b100u) return; // check LOCK-Status
         writeMemory(&scratchpad[PAGE1_ADDR], PAGE_SIZE, PAGE1_ADDR);
+        request_persist = 0x22; // Request memory to be persisted
+
         // NOTE: OP occupies real NV for ~ 10 ms (NVB-Bit)
         timer_nvwr = millis() + DURATION_NVWR_ms;
         break;
 
     case 0x25:      // copy scratchpad SP2 to NV2
         writeMemory(&scratchpad[PAGE2_ADDR], PAGE_SIZE, PAGE2_ADDR);
+        request_persist = 0x25; // Request memory to be persisted
+
         // NOTE: OP occupies real NV for ~ 10 ms (NVB-Bit)
         timer_nvwr = millis() + DURATION_NVWR_ms;
         break;
@@ -202,4 +208,102 @@ void DS2434::setBatteryCounter(uint16_t value)
 void DS2434::setID(uint16_t value)
 {
     *((uint16_t *) &memory[0x80]) = value;
+}
+
+/*
+ * This will persiste memory to the EEPROM. Due to the time
+ * it takes to write, we'll need to poll in between to avoid dropping
+ * requests.
+ * 
+ * Returns: true if memory needs to be persisted
+ */
+bool DS2434::checkPersistMemory(OneWireHub& hub){
+
+    // Only write if there has been a request
+    if(request_persist == 0x00){
+        return false;
+    }
+
+    uint8_t address_start;
+    uint8_t address_end;
+
+    switch(request_persist){
+
+        case 0x01: // Initialize - write everything the first time
+            address_start = PAGE1_ADDR;
+            address_end   = PAGE6_ADDR;
+            break;
+        case 0x22: // Copy SP1 to NV1
+            address_start = PAGE1_ADDR;
+            address_end   = PAGE2_ADDR;
+            break;
+        case 0x25: // Copy SP2 to NV2
+            address_start = PAGE2_ADDR;
+            address_end   = PAGE3_ADDR;
+            break;
+        case 0xB5: // Update charge cycle counts
+        case 0xB8:
+            address_start = 0x82;
+            address_end   = 0x84;
+            break;
+        default:
+            request_persist = 0x00;
+            return true;
+            break;
+    }
+
+    // Loop through each byte and write to EEPROM
+    for (uint8_t nByte = address_start; nByte < address_end; ++nByte)
+    {
+        uint8_t byte_mem = memory[nByte];
+        uint8_t byte_rom = EEPROM.read(nByte);
+
+        // Only write if the byte has changed
+        if(byte_mem != byte_rom){
+            EEPROM.write(nByte, byte_mem);
+
+            // Poll after each write due to write time (~3ms per byte)
+            hub.poll();
+        }
+    }
+
+    // If this is an initial write, write a status byte
+    if(request_persist == 0x01){
+        EEPROM.write(PAGE6_ADDR, PERSIST_STATUS);
+    }
+
+    request_persist = 0x00;
+    return true;
+}
+
+/*
+ * Restores the memory from EEPROM. This should only happen on startup.
+ * All other times, use the "memory" variable.
+ * 
+ * Returns: true if memory was found and restored
+ */
+bool DS2434::checkRestoreMemory(){
+
+    uint8_t status = EEPROM.read(PAGE6_ADDR);
+
+    // If the status byte has not been set, return
+    if(status != PERSIST_STATUS){
+        return false;
+    }
+
+    // Restore all the memory from EEPROM
+    for (uint8_t nByte = PAGE1_ADDR; nByte < PAGE6_ADDR; ++nByte)
+    {
+        memory[nByte] = EEPROM.read(nByte);
+    }
+
+    return true;
+}
+
+/*
+ * Triggers the system to persist all memory to the EEPROM
+ */
+void DS2434::persistAllMemory(){
+    request_persist == 0x01;
+    return;
 }
