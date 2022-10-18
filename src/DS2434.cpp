@@ -304,6 +304,6 @@ bool DS2434::checkRestoreMemory(){
  * Triggers the system to persist all memory to the EEPROM
  */
 void DS2434::persistAllMemory(){
-    request_persist == 0x01;
+    request_persist = 0x01;
     return;
 }
