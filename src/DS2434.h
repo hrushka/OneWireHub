@@ -48,8 +48,18 @@ private:
     static constexpr uint8_t  PAGE_SIZE          { 32 };
     static constexpr uint8_t  PAGE_COUNT         { 5 };
 
-    static constexpr uint8_t  MEM_SIZE           { 3 * PAGE_SIZE };
-    static constexpr uint8_t  SCRATCHPAD_SIZE    { PAGE_COUNT * PAGE_SIZE };
+    static constexpr uint8_t  MEM_SIZE           { 4 * PAGE_SIZE + 4 }; // Limit the memory size to the working space
+    static constexpr uint8_t  SCRATCHPAD_SIZE    { 3 * PAGE_SIZE }; // Scratchpad is used for first 3 pages
+
+    static constexpr uint32_t DURATION_TEMP_ms   { 230 };
+    static constexpr uint32_t DURATION_NVWR_ms   { 10 };
+
+    static constexpr uint8_t  PERSIST_STATUS     { 0x71 };
+
+    uint32_t timer_temp = 0u;
+    uint32_t timer_nvwr = 0u;
+    bool     request_temp = false;
+    uint8_t  request_persist = 0x00;
 
     uint8_t  memory[MEM_SIZE];
     uint8_t  scratchpad[SCRATCHPAD_SIZE];
@@ -65,6 +75,10 @@ public:
     void    duty(OneWireHub * hub) final;
 
     void    clearMemory(void);
+
+    bool    checkPersistMemory(OneWireHub & hub);
+    bool    checkRestoreMemory();
+    void    persistAllMemory();
 
     bool    writeMemory(const uint8_t* source, uint16_t length, uint16_t position = 0);
     bool    readMemory(uint8_t* destination, uint16_t length, uint16_t position = 0) const;
